@@ -1,0 +1,18 @@
+﻿<Window x:Class="WPerformanceViewer"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="231" d:DesignWidth="232" WindowStyle="ToolWindow" ResizeMode="NoResize">
+    <StackPanel>
+        <Label Content="Paged Memory:" FontWeight="Bold"/>
+        <Label Name="lblPagedMemory" Content="{}{Paged Memory}"/>
+        <Label Content="Unpaged Memory:" FontWeight="Bold"/>
+        <Label Name="lblUnPagedMemory" Content="{}{Unpaged Memory}"/>
+        <Label Content="Working Set:" FontWeight="Bold"/>
+        <Label Name="lblWorkingSet" Content="{}{Working Set}"/>
+        <Label Content="Other:" FontWeight="Bold"/>
+        <Label Name="lblOther" Content="{}{Other}"/>
+    </StackPanel>
+</Window>
