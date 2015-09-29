@@ -169,14 +169,6 @@
   <ItemGroup>
     <None Include="Resources\ConsoleIcon.ico" />
   </ItemGroup>
-  <ItemGroup>
-    <Content Include="WindowsHookLib.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="WindowsHookLib.xml">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
