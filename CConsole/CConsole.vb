@@ -22,13 +22,13 @@
 '             and may work with WPF applications as well now
 '           - The Status bar functions (such as 'Always on Top') are now in the menu on the top of the form,
 '             and are now checkable, vs the old highlighted method.
-'           - The new form and functionality are accessable via the WPF sub class
+'           - The new form and functionality are accessible via the WPF sub class
 ' Version 0.3:
 '           - Added multitab functionality. This enables multiple streams of output to be visually separate.
 ' Version 0.3.0.1:;
 '           - Added write interval for a continuous checking of something.
 ' Version 0.3.1:
-'           - Added DatasourceViewer. Allows quick viewing of datatables and objects.
+'           - Added DataSourceViewer. Allows quick viewing of datatables and objects.
 ' Version 0.4:
 '           - Removed WinForm Version functionality. Left the form in however.
 '           - Corrected write for IEnumerables to work with WPf version
@@ -38,18 +38,21 @@
 '           - Fixed WriteClass to only write to console once, ensuring the call will be displayed
 '             as a block even when the volume of calls to write is high.
 '           - Did the same for the IEnumerable overload of Write
-'           - Added tab overloads for both of them, as well as a intervel overload for the IEnumerable overload of Write
+'           - Added tab overloads for both of them, as well as a interval overload for the IEnumerable overload of Write
+' Version 0.4.1:
+'           - Added tabbing to the DataSourceViewer. It now creates a new tab, rather than a new window, when you set a new source.
+'             This will enable visual tracking of changes in the datatables.
 ' ----------------------------------------------------------------------------------------------------------------------------
 ' Tasks
 ' ----------------------------------------------------------------------------------------------------------------------------
 ' CONTENTTODO: Change the writer functionality to work in a queued fashion, to prevent of the over lapping blocks of information
-' CONTENTTODO: Add tabbing functionality to the DataSourceViewer
+' CONTENTTODO: Add datatable change tracking (Might be too resource intensive)
+' CONTENTTODO: Possibly add a generic way to track changes in an object 
 ' ----------------------------------------------------------------------------------------------------------------------------
 ' Imports
 ' ----------------------------------------------------------------------------------------------------------------------------
 Imports System.IO
 Imports System.Reflection
-Imports System.Threading.Tasks
 Imports System.Windows.Forms
 Imports System.Windows.Forms.Integration
 

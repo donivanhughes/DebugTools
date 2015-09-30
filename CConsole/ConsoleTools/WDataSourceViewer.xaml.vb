@@ -1,25 +1,34 @@
-﻿Public Class WDataSourceViewer
-    Public Property Source As Object
-        Get
-            Return dgvMain.ItemsSource
-        End Get
-        Set(value As Object)
-            Dim objSource
-            If TypeOf (value) Is DataTable Then
-                '    Dim liaBuffer As New List(Of Object)
-                '    For Each drRow As DataRow In DirectCast(value, DataTable).Rows
-                '        liaBuffer.Add(drRow.ItemArray.ToArray)
-                '    Next
-                '    objSource = liaBuffer
-                'Else
-                objSource = DirectCast(value, DataTable).AsDataView
+﻿Imports System.Windows.Controls
+
+Public Class WDataSourceViewer
+
+    Public Sub AddSource(objSource As Object)
+        Dim strWindowName As String
+        strWindowName = "NO NAME"
+        If TypeOf (objSource) Is DataTable Then
+            If DirectCast(objSource, DataTable).TableName.IsNullOrEmpty = False Then
+                strWindowName = DirectCast(objSource, DataTable).TableName
+            Else
+                strWindowName = Now.ToShortTimeString
             End If
-            'dgvMain.DataContext = objSource
 
-            dgvMain.ItemsSource = objSource
+            objSource = DirectCast(objSource, DataTable).AsDataView
 
+        End If
 
+        Dim dgNew = AddWindow(strWindowName)
+        dgNew.ItemsSource = objSource
+    End Sub
+    Private Function AddWindow(strWindow As String) As DataGrid
+        Dim tabCopy As TabItem = New TabItem()
+        Dim dgNew As New DataGrid
+        tabCopy.Header = strWindow
+        Dim dkpContainer As New DockPanel
+        dkpContainer.Children.Add(dgNew)
+        tabCopy.Content = dkpContainer
+        Dim intNewTabIndex As Integer = tctlWindowFrame.Items.Add(tabCopy)
+        tctlWindowFrame.SelectedIndex = intNewTabIndex
 
-        End Set
-    End Property
+        Return dgNew
+    End Function
 End Class

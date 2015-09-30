@@ -187,7 +187,10 @@ Public Class WConsole
     Private Sub tmrCleanUp_Tick() Handles tmrCleanUp.Elapsed
         If ltskToCleanUp.Count > 0 Then
             For Each tskRunning As Task In ltskToCleanUp
-                tskRunning.Dispose()
+                If tskRunning.IsCompleted Then
+                    tskRunning.Dispose()
+                End If
+
             Next
             ltskToCleanUp.Clear()
         End If
@@ -299,8 +302,12 @@ Public Class WConsole
         mnuToolsDataSourceViewer_Checked()
     End Sub
     Private Sub mnuToolsDataSourceViewer_Checked() Handles mnuToolsDataSourceViewer.Checked
-        wpfDataSourceViewer = New WDataSourceViewer()
-        wpfDataSourceViewer.Source = CConsole.Source
+        If wpfDataSourceViewer Is Nothing Then
+            wpfDataSourceViewer = New WDataSourceViewer()
+        End If
+
+
+        wpfDataSourceViewer.AddSource(CConsole.Source)
         wpfDataSourceViewer.Show()
     End Sub
 
