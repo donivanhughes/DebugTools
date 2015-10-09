@@ -555,9 +555,13 @@ Namespace ConsoleTools
         '''  ------------------------------------------------------------------------------------------
         Public Shared Sub WriteException(ex As Exception)
             If Enabled Then
-                WriteLine("Error: " & ex.Message & vbNewLine &
-                          "Stack Trace: " & ex.StackTrace & vbNewLine &
-                          m_strSeparator, "Errors")
+                Dim strMessage As String
+                strMessage &= "Error: " & ex.Message & vbNewLine
+                If ex.InnerException IsNot Nothing Then
+                    strMessage &= "InnerException: " & ex.InnerException.Message & vbNewLine
+                End If
+                strMessage &= "Stack Trace: " & ex.StackTrace & vbNewLine & m_strSeparator
+                WriteLine(strMessage, "Errors")
             End If
         End Sub
 #End Region
