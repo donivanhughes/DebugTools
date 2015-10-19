@@ -115,6 +115,7 @@ Public Class WConsole
         txtNewConsole.Padding = txtConsoleWindow.Padding
         txtNewConsole.TextWrapping = txtConsoleWindow.TextWrapping
         txtConsoleWindow.Margin = txtConsoleWindow.Margin
+        txtNewConsole.VerticalScrollBarVisibility = ScrollBarVisibility.Auto
         dicWindows.Add(strWindowName, txtNewConsole)
         Dim dkpContainer As New DockPanel
         dkpContainer.Children.Add(txtNewConsole)

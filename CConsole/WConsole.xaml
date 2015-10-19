@@ -47,7 +47,7 @@
             <TabItem x:Name="tabMain" Header="Main">
 
                 <Grid Background="#FFE5E5E5">
-                    <TextBox x:Name="txtConsoleWindow" TextWrapping="Wrap" UndoLimit="0" Background="Black" Foreground="White" FontFamily="Lucida Console" FontSize="14" BorderThickness="0" BorderBrush="{x:Null}" HorizontalScrollBarVisibility="Auto"/>
+                    <TextBox VerticalScrollBarVisibility="Auto" x:Name="txtConsoleWindow" TextWrapping="Wrap" UndoLimit="0" Background="Black" Foreground="White" FontFamily="Lucida Console" FontSize="14" BorderThickness="0" BorderBrush="{x:Null}" HorizontalScrollBarVisibility="Auto"/>
 
                 </Grid>
             </TabItem>
