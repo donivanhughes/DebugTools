@@ -42,8 +42,10 @@
 ' Version 0.4.1:
 '           - Added tabbing to the DataSourceViewer. It now creates a new tab, rather than a new window, when you set a new source.
 '             This will enable visual tracking of changes in the datatables.
-' Version 0.4.2:
+' Version 0.4.2.1:
 '           - Added a tools menu to DataSourceViewer that uses EPPlus to write the current tabs datatable to an excel file and allow you to save it.
+' Version 0.4.2.2:
+'           - Added scroll bar to console window textbox
 ' ----------------------------------------------------------------------------------------------------------------------------
 ' Tasks
 ' ----------------------------------------------------------------------------------------------------------------------------
