@@ -178,6 +178,12 @@ Namespace ConsoleTools
 #End Region
 
 #Region "Write Overloads"
+        ''' ------------------------------------------------------------------------------------------
+        '''  Name: Write
+        '''  ------------------------------------------------------------------------------------------
+        ''' <summary> Writes the specified text to the CConsole output. </summary>
+        ''' <param name="strText">The text to write to the CConsole output.</param>
+        '''  ------------------------------------------------------------------------------------------
         Public Shared Sub Write(strText As String)
             If Enabled AndAlso My.Settings.ToolsEnabled Then
                 Intitialize()
@@ -186,6 +192,13 @@ Namespace ConsoleTools
             Application.DoEvents()
         End Sub
 
+        ''' ------------------------------------------------------------------------------------------
+        '''  Name: Write
+        '''  ------------------------------------------------------------------------------------------
+        ''' <summary> Writes the specified text to the CConsole output. </summary>
+        ''' <param name="strText">The text to write to the CConsole output.</param>
+        ''' <param name="strWindowName">The name of the window to write the output into.</param>
+        '''  ------------------------------------------------------------------------------------------
         Public Shared Sub Write(strText As String, strWindowName As String)
             If Enabled Then
                 Intitialize()
@@ -194,6 +207,14 @@ Namespace ConsoleTools
             Application.DoEvents()
         End Sub
 
+        ''' ------------------------------------------------------------------------------------------
+        '''  Name: Write
+        '''  ------------------------------------------------------------------------------------------
+        ''' <summary> Writes the specified text to the CConsole output. </summary>
+        ''' <param name="strText">The text to write to the CConsole output.</param>
+        ''' <param name="strWindowName">The name of the window to write the output into.</param>
+        ''' <param name="dblInterval">The minimum time in seconds allowed between writes to the output window</param>
+        '''  ------------------------------------------------------------------------------------------
         Public Shared Sub Write(strText As String, strWindowName As String, dblInterval As Double)
             If Enabled Then
                 Intitialize()
@@ -210,6 +231,15 @@ Namespace ConsoleTools
         ''' ------------------------------------------------------------------------------------------
         Public Shared Sub Write(ienuOutput As IEnumerable)
             Write(ienuOutput, "Main", 0)
+        End Sub
+        ''' ------------------------------------------------------------------------------------------
+        ''' Name: Write
+        ''' ------------------------------------------------------------------------------------------
+        ''' <summary> Writes the specified IEnumerable to the CConsole output. </summary>
+        ''' <param name="xelOutput">The XElement to write to the CConsole output.</param>
+        ''' ------------------------------------------------------------------------------------------
+        Public Shared Sub Write(xelOutput As XElement)
+            Write(xelOutput.ToString, "Main", 0)
         End Sub
 
         ''' ------------------------------------------------------------------------------------------
@@ -286,11 +316,22 @@ Namespace ConsoleTools
             End If
         End Sub
 
+        ''' ------------------------------------------------------------------------------------------
+        '''  Name: Open
+        '''  ------------------------------------------------------------------------------------------
+        ''' <summary> Opens the CConsole window </summary>
+        '''  ------------------------------------------------------------------------------------------
         Public Shared Sub Open()
             If Enabled Then
                 Intitialize()
             End If
         End Sub
+        ''' ------------------------------------------------------------------------------------------
+        '''  Name: NewWindow
+        '''  ------------------------------------------------------------------------------------------
+        ''' <summary> Adds a new output window </summary>
+        ''' <param name="strName">The name of the window.</param>
+        '''  ------------------------------------------------------------------------------------------
         Public Shared Sub NewWindow(strName As String)
             If Enabled Then
                 wpfConsole.Write("", strName)
@@ -298,6 +339,11 @@ Namespace ConsoleTools
             Application.DoEvents()
         End Sub
 
+        ''' ------------------------------------------------------------------------------------------
+        '''  Name: Clear
+        '''  ------------------------------------------------------------------------------------------
+        ''' <summary> Clears the main output window. </summary>
+        '''  ------------------------------------------------------------------------------------------
         Public Shared Sub Clear()
             If Enabled Then
                 Intitialize()
@@ -305,6 +351,12 @@ Namespace ConsoleTools
             End If
 
         End Sub
+        ''' ------------------------------------------------------------------------------------------
+        '''  Name: Clear
+        '''  ------------------------------------------------------------------------------------------
+        ''' <summary> Clears the specified output window. </summary>
+        ''' <param name="strWindow">The name of the window to clear.</param>
+        '''  ------------------------------------------------------------------------------------------
         Public Shared Sub Clear(strWindow)
             If Enabled Then
                 Intitialize()
