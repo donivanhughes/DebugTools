@@ -52,7 +52,7 @@ Public Class WConsole
         End If
         tmrUpdateInfo.Interval = 10
         tmrCleanUp.Interval = 1000
-        tmrRunTask.Interval = 1
+        tmrRunTask.Interval = 0.00001
         tmrUpdateInfo.Start()
         tmrCleanUp.Start()
         tmrRunTask.Start()
@@ -355,7 +355,9 @@ Public Class WConsole
     End Sub
 
     Private Sub tmrRunTask_Elapsed(sender As Object, e As Timers.ElapsedEventArgs) Handles tmrRunTask.Elapsed
-        WaitForProcessing()
+        If blnProcessing = True Then
+            Exit Sub
+        End If
         If qtskActions.IsNullOrEmpty = False Then
             Dim tskNext As Task = qtskActions.Dequeue
 
