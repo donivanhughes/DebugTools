@@ -46,6 +46,16 @@
 '           - Added a tools menu to DataSourceViewer that uses EPPlus to write the current tabs datatable to an excel file and allow you to save it.
 ' Version 0.4.2.2:
 '           - Added scroll bar to console window textbox
+' Version 0.5:
+'           - Converted the windows output area from a Textbox to a RichTextbox
+'           - It now writes to a single paragraph until you specify otherwise via NewParagraph
+'             which, like everything else, works on a per window basis. If at any point you use any of the new 
+'             functions , such as SetFontSize, it will affect the entire current paragraph.
+'           - Added functions to manipulate the current paragraph:
+'               SetStyle - Let you Bold, Italisize, Underline,, Strike and a few other things
+'               SetFontSize - Sets the current paragraphs font size to the number specified
+'           - Changed the write functionality to use a queue system, so while it may be slower now, all of your
+'             writes and changes should be in order.
 ' ----------------------------------------------------------------------------------------------------------------------------
 ' Tasks
 ' ----------------------------------------------------------------------------------------------------------------------------
@@ -177,6 +187,18 @@ Namespace ConsoleTools
 
 #End Region
 
+#Region "Enums"
+        Public Enum TextStyles
+            Bold
+            Italic
+            Underline
+            BaseLine
+            OverLine
+            Strike
+        End Enum
+
+#End Region
+
 #Region "Write Overloads"
         ''' ------------------------------------------------------------------------------------------
         '''  Name: Write
@@ -304,7 +326,44 @@ Namespace ConsoleTools
         End Sub
 
 #End Region
-
+#Region "RichTextBox Functionality"
+        Public Shared Sub NewParagraph()
+            If Enabled Then
+                Intitialize()
+                wpfConsole.NewParagraph("Main")
+            End If
+        End Sub
+        Public Shared Sub NewParagraph(strWindow As String)
+            If Enabled Then
+                Intitialize()
+                wpfConsole.NewParagraph(strWindow)
+            End If
+        End Sub
+        Public Shared Sub SetStyle(TextStyle As TextStyles)
+            If Enabled Then
+                Intitialize()
+                wpfConsole.SetStyling("Main", TextStyle)
+            End If
+        End Sub
+        Public Shared Sub SetStyle(strWindow As String, TextStyle As TextStyles)
+            If Enabled Then
+                Intitialize()
+                wpfConsole.SetStyling(strWindow, TextStyle)
+            End If
+        End Sub
+        Public Shared Sub SetFontSize(dblFontSize As Double)
+            If Enabled Then
+                Intitialize()
+                wpfConsole.SetStyling("Main", dblFontSize)
+            End If
+        End Sub
+        Public Shared Sub SetFontSize(strWindow As String, dblFontSize As Double)
+            If Enabled Then
+                Intitialize()
+                wpfConsole.SetStyling(strWindow, dblFontSize)
+            End If
+        End Sub
+#End Region
 #Region "Secondary Functionality"
         Private Shared Sub Intitialize()
             If Enabled Then

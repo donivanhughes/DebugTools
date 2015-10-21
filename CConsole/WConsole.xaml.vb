@@ -2,7 +2,9 @@
 Imports System.Text
 Imports System.Threading.Tasks
 Imports System.Threading
+Imports System.Windows
 Imports System.Windows.Controls
+Imports System.Windows.Documents
 Imports System.Windows.Forms
 Imports System.Windows.Forms.Integration
 Imports System.Windows.Input
@@ -18,13 +20,17 @@ Public Class WConsole
     'Delegate Sub SetPerformanceCallback(frmLocalPerformanceViewer As FPerformanceViewer)
     Private wpfPerformanceViewer As WPerformanceViewer
     Private wpfDataSourceViewer As WDataSourceViewer
-    Private dicWindows As Dictionary(Of String, Windows.Controls.TextBox)
+    Private dicWindows As Dictionary(Of String, Windows.Controls.RichTextBox)
     Private WithEvents tmrUpdateInfo As New Timers.Timer
     Private WithEvents tmrCleanUp As New Timers.Timer
+    Private WithEvents tmrRunTask As New Timers.Timer
     Private dblTimeSinceWrite As Double = 0
     Private lkeyPressedKeys As New List(Of Key)
     Private ltskToCleanUp As New List(Of Task)
-   
+    Private blnProcessing As Boolean = False
+    Private qtskActions As New Queue(Of Task)
+
+
 
 
     Public Sub New()
@@ -33,7 +39,12 @@ Public Class WConsole
         InitializeComponent()
 
         ' Add any initialization after the InitializeComponent() call.
-        dicWindows = New Dictionary(Of String, Windows.Controls.TextBox) From {{"Main", txtConsoleWindow}}
+        dicWindows = New Dictionary(Of String, Windows.Controls.RichTextBox) From {{"Main", txtConsoleWindow}}
+
+        Dim parNew As New Paragraph
+        txtConsoleWindow.Document.Blocks.Clear()
+        txtConsoleWindow.Document.Blocks.Add(parNew)
+        txtConsoleWindow.Tag = parNew
 
 
         If CConsole.AlwaysOnTop = True Then
@@ -41,31 +52,34 @@ Public Class WConsole
         End If
         tmrUpdateInfo.Interval = 10
         tmrCleanUp.Interval = 1000
+        tmrRunTask.Interval = 1
         tmrUpdateInfo.Start()
         tmrCleanUp.Start()
+        tmrRunTask.Start()
     End Sub
 
     Private Sub SetText(strText As String)
         txtConsoleWindow.AppendText(strText)
 
-        Application.DoEvents()
+        Forms.Application.DoEvents()
     End Sub
 
 
-    Friend Sub Write(strText As String)
-        Dim SuppressWarning = Task.Run(Sub()
-                                           Dispatcher.InvokeAsync(New Action(Sub()
-                                                                                 txtConsoleWindow.AppendText(strText)
-                                                                                 Application.DoEvents()
+    'Friend Sub Write(strText As String)
+    '    Dim SuppressWarning = New Task(Sub()
+    '                                       Dispatcher.InvokeAsync(New Action(Sub()
+    '                                                                             txtConsoleWindow.AppendText(strText)
+    '                                                                             tmrRunTask.Start()
+    '                                                                             Application.DoEvents()
 
-                                                                             End Sub), Windows.Threading.DispatcherPriority.Background)
-                                       End Sub)
+    '                                                                         End Sub), Windows.Threading.DispatcherPriority.Background)
+    '                                   End Sub)
+    '    qtskActions.Enqueue(SuppressWarning)
+    '    'ltskToCleanUp.Add(SuppressWarning)
+    '    Application.DoEvents()
 
-        ltskToCleanUp.Add(SuppressWarning)
-        Application.DoEvents()
 
-
-    End Sub
+    'End Sub
 
     Friend Sub Write(strText As String, strWindow As String, Optional dblInterval As Double = 0)
         If dblInterval = 0 OrElse dblTimeSinceWrite > dblInterval Then
@@ -74,37 +88,108 @@ Public Class WConsole
             If dicWindows.ContainsKey(strWindow) = False Then
                 AddNewWindow(strWindow)
             End If
-            Dim SuppressWarning = Task.Run(Sub()
+            Dim SuppressWarning = New Task(Sub()
                                                Dispatcher.InvokeAsync(New Action(Sub()
                                                                                      Try
-
-
-                                                                                         dicWindows(strWindow).AppendText(strText)
-                                                                                         dicWindows(strWindow).ScrollToLine(dicWindows(strWindow).LineCount - 1)
-                                                                                         Application.DoEvents()
+                                                                                         WaitForProcessing()
+                                                                                         blnProcessing = True
+                                                                                         With dicWindows(strWindow)
+                                                                                             Dim parCurrent As Paragraph = .Tag
+                                                                                             parCurrent.Inlines.Add(strText)
+                                                                                             .ScrollToEnd()
+                                                                                         End With
+                                                                                         blnProcessing = False
+                                                                                         Forms.Application.DoEvents()
                                                                                      Catch ex As StackOverflowException
                                                                                          dicWindows(strWindow) = AddNewWindow(strWindow + "Overflow")
                                                                                      Catch ex As Exception
-
+                                                                                         CConsole.WriteException(ex)
                                                                                      End Try
                                                                                  End Sub), Windows.Threading.DispatcherPriority.Background)
                                            End Sub)
 
 
-
-            ltskToCleanUp.Add(SuppressWarning)
+            qtskActions.Enqueue(SuppressWarning)
+            'ltskToCleanUp.Add(SuppressWarning)
+            tmrRunTask.Start()
         End If
-        Application.DoEvents()
+        Forms.Application.DoEvents()
     End Sub
+    Friend Sub NewParagraph(strWindow As String)
+        Dim SuppressWarning = New Task(Sub()
+                                           Dispatcher.InvokeAsync(New Action(Sub()
+                                                                                 Try
+                                                                                     WaitForProcessing()
+                                                                                     blnProcessing = True
+                                                                                     Dim parNew As New Paragraph
+                                                                                     With dicWindows(strWindow)
+                                                                                         .Document.Blocks.Add(parNew)
+                                                                                         .Tag = parNew
+                                                                                     End With
+                                                                                     blnProcessing = False
 
-    Friend Sub ClearWindow(strWindow)
-        dicWindows(strWindow).Text = ""
+                                                                                     Forms.Application.DoEvents()
+                                                                                 Catch ex As StackOverflowException
+                                                                                     dicWindows(strWindow) = AddNewWindow(strWindow + "Overflow")
+                                                                                 Catch ex As Exception
+                                                                                     CConsole.WriteException(ex)
+                                                                                 End Try
+                                                                             End Sub), Windows.Threading.DispatcherPriority.Background)
+                                       End Sub)
+        qtskActions.Enqueue(SuppressWarning)
+        tmrRunTask.Start()
+
     End Sub
-    Private Function AddNewWindow(strWindowName As String) As Windows.Controls.TextBox
+    Friend Sub SetStyling(strWindow As String, TextStyle As CConsole.TextStyles)
+        Dim SuppressWarning = New Task(Sub()
+                                           Dispatcher.InvokeAsync(New Action(Sub()
+                                                                                 With DirectCast(dicWindows(strWindow).Tag, Paragraph)
+
+
+                                                                                     Select Case TextStyle
+                                                                                         Case CConsole.TextStyles.Bold
+                                                                                             .FontWeight = FontWeights.Bold
+                                                                                         Case CConsole.TextStyles.Italic
+                                                                                             .FontStyle = FontStyles.Italic
+                                                                                         Case CConsole.TextStyles.Underline
+                                                                                             .TextDecorations.Add(TextDecorations.Underline)
+                                                                                         Case CConsole.TextStyles.OverLine
+                                                                                             .TextDecorations.Add(TextDecorations.OverLine)
+                                                                                         Case CConsole.TextStyles.Strike
+                                                                                             .TextDecorations.Add(TextDecorations.Strikethrough)
+                                                                                         Case CConsole.TextStyles.BaseLine
+                                                                                             .TextDecorations.Add(TextDecorations.Baseline)
+                                                                                     End Select
+
+                                                                                 End With
+                                                                             End Sub), Windows.Threading.DispatcherPriority.Background)
+                                       End Sub)
+        qtskActions.Enqueue(SuppressWarning)
+        tmrRunTask.Start()
+    End Sub
+    Friend Sub SetStyling(strWindow As String, NewFontSize As Double)
+        Dim SuppressWarning = New Task(Sub()
+                                           Dispatcher.InvokeAsync(New Action(Sub()
+                                                                                 With DirectCast(dicWindows(strWindow).Tag, Paragraph)
+                                                                                     .FontSize = NewFontSize
+                                                                                     End With
+                                                                             End Sub), Windows.Threading.DispatcherPriority.Background)
+                                       End Sub)
+        qtskActions.Enqueue(SuppressWarning)
+        tmrRunTask.Start()
+    End Sub
+    Private Sub WaitForProcessing()
+        While blnProcessing = True
+        End While
+    End Sub
+    Friend Sub ClearWindow(strWindow)
+        dicWindows(strWindow).Document.Blocks.Clear()
+    End Sub
+    Private Function AddNewWindow(strWindowName As String) As Windows.Controls.RichTextBox
         Dim tabCopy As TabItem = New TabItem()
 
         tabCopy.Header = strWindowName
-        Dim txtNewConsole As New Windows.Controls.TextBox
+        Dim txtNewConsole As New Windows.Controls.RichTextBox
         txtNewConsole.Name = "txt" & strWindowName.Replace(" ", "")
         txtNewConsole.Foreground = Windows.Media.Brushes.White
         txtNewConsole.Background = Windows.Media.Brushes.Black
@@ -113,9 +198,13 @@ Public Class WConsole
         txtNewConsole.FontStyle = txtConsoleWindow.FontStyle
         txtNewConsole.BorderThickness = txtConsoleWindow.BorderThickness
         txtNewConsole.Padding = txtConsoleWindow.Padding
-        txtNewConsole.TextWrapping = txtConsoleWindow.TextWrapping
+
         txtConsoleWindow.Margin = txtConsoleWindow.Margin
         txtNewConsole.VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        txtNewConsole.Document.Blocks.Clear()
+        Dim parNew As New Paragraph
+        txtNewConsole.Document.Blocks.Add(parNew)
+        txtNewConsole.Tag = parNew
         dicWindows.Add(strWindowName, txtNewConsole)
         Dim dkpContainer As New DockPanel
         dkpContainer.Children.Add(txtNewConsole)
@@ -123,67 +212,15 @@ Public Class WConsole
 
         Dim intNewTabIndex As Integer = tctlWindowFrame.Items.Add(tabCopy)
         tctlWindowFrame.SelectedIndex = intNewTabIndex
-        Application.DoEvents()
+        Forms.Application.DoEvents()
 
         Return txtNewConsole
     End Function
-    'Private Async Sub btnViewPerformance_Click(sender As Object, e As EventArgs) Handles btnViewPerformance.Click
 
-    '    If frmPerformanceViewer IsNot Nothing Then
-    '        CConsole.WriteLine("Closing Performance Viewer...")
-    '        SetBusy(True)
-    '        frmPerformanceViewer.Close()
-    '        frmPerformanceViewer.Dispose()
-    '        frmPerformanceViewer = Nothing
-    '        btnViewPerformance.BackColor = DefaultBackColor
-    '        SetBusy(False)
-
-    '    Else
-    '        CConsole.WriteLine("Building Performance View...")
-    '        btnViewPerformance.Enabled = False
-    '        Await Task.Run(Sub()
-    '                           Dim frmLocalPerformanceViewer As New FPerformanceViewer
-
-    '                           Application.DoEvents()
-    '                           Dim d As New SetPerformanceCallback(AddressOf SetPerformanceViewer)
-    '                           Me.Invoke(d, New Object() {frmLocalPerformanceViewer})
-    '                       End Sub)
-    '    End If
-    'End Sub
-
-    'Private Sub SetBusy(blnBusy As Boolean)
-    '    If blnBusy = True Then
-    '        Cursor = Cursors.WaitCursor
-    '        IsEnabled = False
-    '    Else
-    '        Cursor = Cursors.Default
-    '        IsEnabled = True
-    '    End If
-    'End Sub
-
-    'Private Sub btnClear_Click(sender As Object, e As EventArgs) Handles btnClear.Click
-    '    CConsole.Clear()
-    'End Sub
-
-    'Private Sub tsbMouseData_Click(sender As Object, e As EventArgs) Handles tsbMouseData.Click
-    '    tsRight.Visible = Not tsRight.Visible
-    '    If tsRight.Visible = True Then
-    '        tsbMouseData.BackColor = Color.DodgerBlue
-    '        Me.Size = New Size(New Point(Me.Size.Width + tsRight.Width, Me.Size.Height))
-    '    Else
-    '        tsbMouseData.BackColor = DefaultBackColor
-    '        Me.Size = New Size(New Point(Me.Size.Width - tsRight.Width, Me.Size.Height))
-    '    End If
-    'End Sub
 
     Private Sub tmrUpdateInfo_Tick() Handles tmrUpdateInfo.Elapsed
         dblTimeSinceWrite += tmrUpdateInfo.Interval
         Dispatcher.InvokeAsync(AddressOf UpdateInputData)
-
-        'Dispatcher.InvokeAsync(AddressOf GetKeyboardData)
-        'Dispatcher.InvokeAsync(AddressOf UpdateKeyboardData)
-
-
     End Sub
     Private Sub tmrCleanUp_Tick() Handles tmrCleanUp.Elapsed
         If ltskToCleanUp.Count > 0 Then
@@ -298,7 +335,7 @@ Public Class WConsole
         GC.Collect()
         tmrCleanUp_Tick()
     End Sub
-   
+
     Public Sub OpenDataSourceViewer()
         mnuToolsDataSourceViewer_Checked()
     End Sub
@@ -315,5 +352,20 @@ Public Class WConsole
     Private Sub mnuToolsDataSourceViewer_Unchecked(sender As Object, e As Windows.RoutedEventArgs) Handles mnuToolsDataSourceViewer.Unchecked
         wpfDataSourceViewer.Close()
         wpfDataSourceViewer = Nothing
+    End Sub
+
+    Private Sub tmrRunTask_Elapsed(sender As Object, e As Timers.ElapsedEventArgs) Handles tmrRunTask.Elapsed
+        WaitForProcessing()
+        If qtskActions.IsNullOrEmpty = False Then
+            Dim tskNext As Task = qtskActions.Dequeue
+
+            tskNext.Start()
+            tskNext.Wait()
+
+            tskNext.Dispose()
+        Else
+            tmrRunTask.Stop()
+        End If
+
     End Sub
 End Class
