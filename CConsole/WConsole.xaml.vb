@@ -17,18 +17,19 @@ Public Class WConsole
     Delegate Sub SetTextCallback(strText As String)
 
 
-    'Delegate Sub SetPerformanceCallback(frmLocalPerformanceViewer As FPerformanceViewer)
+
     Private wpfPerformanceViewer As WPerformanceViewer
     Private wpfDataSourceViewer As WDataSourceViewer
-    Private dicWindows As Dictionary(Of String, Windows.Controls.RichTextBox)
+    Private dicWindows As Dictionary(Of String, WindowObject)
+
     Private WithEvents tmrUpdateInfo As New Timers.Timer
     Private WithEvents tmrCleanUp As New Timers.Timer
-    Private WithEvents tmrRunTask As New Timers.Timer
+
     Private dblTimeSinceWrite As Double = 0
     Private lkeyPressedKeys As New List(Of Key)
     Private ltskToCleanUp As New List(Of Task)
     Private blnProcessing As Boolean = False
-    Private qtskActions As New Queue(Of Task)
+
 
 
 
@@ -39,8 +40,8 @@ Public Class WConsole
         InitializeComponent()
 
         ' Add any initialization after the InitializeComponent() call.
-        dicWindows = New Dictionary(Of String, Windows.Controls.RichTextBox) From {{"Main", txtConsoleWindow}}
-
+        dicWindows = New Dictionary(Of String, WindowObject) From {{"Main", New WindowObject(txtConsoleWindow)}}
+        dicWindows("Main").Name = "Main"
         Dim parNew As New Paragraph
         txtConsoleWindow.Document.Blocks.Clear()
         txtConsoleWindow.Document.Blocks.Add(parNew)
@@ -52,11 +53,23 @@ Public Class WConsole
         End If
         tmrUpdateInfo.Interval = 10
         tmrCleanUp.Interval = 1000
-        tmrRunTask.Interval = 0.00001
+
         tmrUpdateInfo.Start()
         tmrCleanUp.Start()
-        tmrRunTask.Start()
+
+
+
     End Sub
+
+    Public ReadOnly Property TextLength(strWindowName) As Double
+        Get
+            Dim dblReturnValue As Double = -1
+            If dicWindows.ContainsKey(strWindowName) Then
+                dblReturnValue = dicWindows(strWindowName).Textbox.Length
+            End If
+            Return dblReturnValue
+        End Get
+    End Property
 
     Private Sub SetText(strText As String)
         txtConsoleWindow.AppendText(strText)
@@ -65,24 +78,9 @@ Public Class WConsole
     End Sub
 
 
-    'Friend Sub Write(strText As String)
-    '    Dim SuppressWarning = New Task(Sub()
-    '                                       Dispatcher.InvokeAsync(New Action(Sub()
-    '                                                                             txtConsoleWindow.AppendText(strText)
-    '                                                                             tmrRunTask.Start()
-    '                                                                             Application.DoEvents()
 
-    '                                                                         End Sub), Windows.Threading.DispatcherPriority.Background)
-    '                                   End Sub)
-    '    qtskActions.Enqueue(SuppressWarning)
-    '    'ltskToCleanUp.Add(SuppressWarning)
-    '    Application.DoEvents()
-
-
-    'End Sub
-
-    Friend Sub Write(strText As String, strWindow As String, Optional dblInterval As Double = 0)
-        If dblInterval = 0 OrElse dblTimeSinceWrite > dblInterval Then
+    Friend Sub Write(strText As String, strWindow As String, Optional dblInterval As Double = 0, Optional ByVal blnIsException As Boolean = False)
+        If Math.Abs(dblInterval - 0) < 0 OrElse dblTimeSinceWrite > dblInterval Then
             dblTimeSinceWrite = 0
 
             If dicWindows.ContainsKey(strWindow) = False Then
@@ -93,25 +91,35 @@ Public Class WConsole
                                                                                      Try
                                                                                          WaitForProcessing()
                                                                                          blnProcessing = True
-                                                                                         With dicWindows(strWindow)
-                                                                                             Dim parCurrent As Paragraph = .Tag
+                                                                                         Dim parCurrent As Paragraph
+                                                                                         If dicWindows(strWindow).Textbox.Length > Short.MaxValue Then
+                                                                                             HandleOverFlow(dicWindows(strWindow))
+                                                                                         End If
+                                                                                         With dicWindows(strWindow).Textbox
+                                                                                             parCurrent = .Tag
                                                                                              parCurrent.Inlines.Add(strText)
                                                                                              .ScrollToEnd()
                                                                                          End With
                                                                                          blnProcessing = False
                                                                                          Forms.Application.DoEvents()
-                                                                                     Catch ex As StackOverflowException
-                                                                                         dicWindows(strWindow) = AddNewWindow(strWindow + "Overflow")
+
+
                                                                                      Catch ex As Exception
+                                                                                         blnProcessing = False
                                                                                          CConsole.WriteException(ex)
                                                                                      End Try
                                                                                  End Sub), Windows.Threading.DispatcherPriority.Background)
                                            End Sub)
 
+            If blnIsException = False Then
+                WaitForProcessing()
+                dicWindows(strWindow).QueueTask(SuppressWarning)
+            Else
+                SuppressWarning.Start()
+            End If
 
-            qtskActions.Enqueue(SuppressWarning)
             'ltskToCleanUp.Add(SuppressWarning)
-            tmrRunTask.Start()
+
         End If
         Forms.Application.DoEvents()
     End Sub
@@ -122,7 +130,7 @@ Public Class WConsole
                                                                                      WaitForProcessing()
                                                                                      blnProcessing = True
                                                                                      Dim parNew As New Paragraph
-                                                                                     With dicWindows(strWindow)
+                                                                                     With dicWindows(strWindow).Textbox
                                                                                          .Document.Blocks.Add(parNew)
                                                                                          .Tag = parNew
                                                                                      End With
@@ -132,18 +140,20 @@ Public Class WConsole
                                                                                  Catch ex As StackOverflowException
                                                                                      dicWindows(strWindow) = AddNewWindow(strWindow + "Overflow")
                                                                                  Catch ex As Exception
+                                                                                     blnProcessing = False
                                                                                      CConsole.WriteException(ex)
                                                                                  End Try
                                                                              End Sub), Windows.Threading.DispatcherPriority.Background)
                                        End Sub)
-        qtskActions.Enqueue(SuppressWarning)
-        tmrRunTask.Start()
+
+        dicWindows(strWindow).QueueTask(SuppressWarning)
+
 
     End Sub
     Friend Sub SetStyling(strWindow As String, TextStyle As CConsole.TextStyles)
         Dim SuppressWarning = New Task(Sub()
                                            Dispatcher.InvokeAsync(New Action(Sub()
-                                                                                 With DirectCast(dicWindows(strWindow).Tag, Paragraph)
+                                                                                 With DirectCast(dicWindows(strWindow).Textbox.Tag, Paragraph)
 
 
                                                                                      Select Case TextStyle
@@ -164,57 +174,137 @@ Public Class WConsole
                                                                                  End With
                                                                              End Sub), Windows.Threading.DispatcherPriority.Background)
                                        End Sub)
-        qtskActions.Enqueue(SuppressWarning)
-        tmrRunTask.Start()
+        dicWindows(strWindow).QueueTask(SuppressWarning)
+
     End Sub
     Friend Sub SetStyling(strWindow As String, NewFontSize As Double)
         Dim SuppressWarning = New Task(Sub()
                                            Dispatcher.InvokeAsync(New Action(Sub()
-                                                                                 With DirectCast(dicWindows(strWindow).Tag, Paragraph)
+                                                                                 With DirectCast(dicWindows(strWindow).Textbox.Tag, Paragraph)
                                                                                      .FontSize = NewFontSize
-                                                                                     End With
+                                                                                 End With
                                                                              End Sub), Windows.Threading.DispatcherPriority.Background)
                                        End Sub)
-        qtskActions.Enqueue(SuppressWarning)
-        tmrRunTask.Start()
+        dicWindows(strWindow).QueueTask(SuppressWarning)
+
     End Sub
     Private Sub WaitForProcessing()
         While blnProcessing = True
         End While
     End Sub
-    Friend Sub ClearWindow(strWindow)
-        dicWindows(strWindow).Document.Blocks.Clear()
+    Private Sub HandleOverFlow(clsWindowObject As WindowObject)
+
+        Dispatcher.Invoke(Sub()
+
+
+                              Try
+
+                                  Dim strOldWindowHeader As String
+                                  Dim tabCopy As TabItem = New TabItem()
+                                  Dim txtNewConsole As Windows.Controls.RichTextBox = Nothing
+
+
+                                  clsWindowObject.OverflowCount += 1
+
+                                  tabCopy.Header = clsWindowObject.Name & "(" & clsWindowObject.OverflowCount & ")"
+
+                                  txtNewConsole = New Windows.Controls.RichTextBox
+                                  txtNewConsole.Name = "txt" & clsWindowObject.Textbox.Name & clsWindowObject.OverflowCount
+
+                                  txtNewConsole.Foreground = Windows.Media.Brushes.White
+                                  txtNewConsole.Background = Windows.Media.Brushes.Black
+                                  txtNewConsole.FontFamily = txtConsoleWindow.FontFamily
+                                  txtNewConsole.FontSize = txtConsoleWindow.FontSize
+                                  txtNewConsole.FontStyle = txtConsoleWindow.FontStyle
+                                  txtNewConsole.BorderThickness = txtConsoleWindow.BorderThickness
+                                  txtNewConsole.Padding = txtConsoleWindow.Padding
+
+                                  txtNewConsole.Margin = txtConsoleWindow.Margin
+                                  txtNewConsole.VerticalScrollBarVisibility = txtConsoleWindow.VerticalScrollBarVisibility
+                                  txtNewConsole.Document.Blocks.Clear()
+                                  Dim parNew As New Paragraph
+                                  txtNewConsole.Document.Blocks.Add(parNew)
+                                  txtNewConsole.Tag = parNew
+
+                                  clsWindowObject.Textbox = txtNewConsole
+                                  Dim dkpContainer As New DockPanel
+                                  dkpContainer.Children.Add(txtNewConsole)
+                                  tabCopy.Content = dkpContainer
+
+                                  Dim intNewTabIndex As Integer = tctlWindowFrame.Items.Add(tabCopy)
+                                  tctlWindowFrame.SelectedIndex = intNewTabIndex
+                                  Forms.Application.DoEvents()
+
+                              Catch ex As Exception
+                                  blnProcessing = False
+                                  CConsole.WriteException(ex)
+                              End Try
+
+                          End Sub
+        )
     End Sub
-    Private Function AddNewWindow(strWindowName As String) As Windows.Controls.RichTextBox
-        Dim tabCopy As TabItem = New TabItem()
+    Friend Sub ClearWindow(strWindow)
+        Try
 
-        tabCopy.Header = strWindowName
-        Dim txtNewConsole As New Windows.Controls.RichTextBox
-        txtNewConsole.Name = "txt" & strWindowName.Replace(" ", "")
-        txtNewConsole.Foreground = Windows.Media.Brushes.White
-        txtNewConsole.Background = Windows.Media.Brushes.Black
-        txtNewConsole.FontFamily = txtConsoleWindow.FontFamily
-        txtNewConsole.FontSize = txtConsoleWindow.FontSize
-        txtNewConsole.FontStyle = txtConsoleWindow.FontStyle
-        txtNewConsole.BorderThickness = txtConsoleWindow.BorderThickness
-        txtNewConsole.Padding = txtConsoleWindow.Padding
+            If dicWindows.ContainsKey(strWindow) Then
+                With dicWindows(strWindow).Textbox
+                    .Document.Blocks.Clear()
+                    .Document.Blocks.Add(New Paragraph)
+                    .Tag = .Document.Blocks(0)
+                End With
+            End If
+        Catch ex As Exception
+            blnProcessing = False
+            CConsole.WriteException(ex)
+        End Try
+    End Sub
+    <STAThread>
+    Private Function AddNewWindow(strWindowName As String) As WindowObject
 
-        txtConsoleWindow.Margin = txtConsoleWindow.Margin
-        txtNewConsole.VerticalScrollBarVisibility = ScrollBarVisibility.Auto
-        txtNewConsole.Document.Blocks.Clear()
-        Dim parNew As New Paragraph
-        txtNewConsole.Document.Blocks.Add(parNew)
-        txtNewConsole.Tag = parNew
-        dicWindows.Add(strWindowName, txtNewConsole)
-        Dim dkpContainer As New DockPanel
-        dkpContainer.Children.Add(txtNewConsole)
-        tabCopy.Content = dkpContainer
+        Return Dispatcher.Invoke(Of WindowObject)(Function()
+                                                      Dim clsNewContainer As WindowObject = Nothing
 
-        Dim intNewTabIndex As Integer = tctlWindowFrame.Items.Add(tabCopy)
-        tctlWindowFrame.SelectedIndex = intNewTabIndex
-        Forms.Application.DoEvents()
+                                                      Try
 
-        Return txtNewConsole
+
+                                                          Dim tabCopy As TabItem = New TabItem()
+                                                          Dim txtNewConsole As Windows.Controls.RichTextBox = Nothing
+                                                          tabCopy.Header = strWindowName
+                                                          txtNewConsole = New Windows.Controls.RichTextBox
+                                                          txtNewConsole.Name = "txt" & strWindowName.Replace(" ", "")
+                                                          txtNewConsole.Foreground = Windows.Media.Brushes.White
+                                                          txtNewConsole.Background = Windows.Media.Brushes.Black
+                                                          txtNewConsole.FontFamily = txtConsoleWindow.FontFamily
+                                                          txtNewConsole.FontSize = txtConsoleWindow.FontSize
+                                                          txtNewConsole.FontStyle = txtConsoleWindow.FontStyle
+                                                          txtNewConsole.BorderThickness = txtConsoleWindow.BorderThickness
+                                                          txtNewConsole.Padding = txtConsoleWindow.Padding
+
+                                                          txtNewConsole.Margin = txtConsoleWindow.Margin
+                                                          txtNewConsole.VerticalScrollBarVisibility = txtConsoleWindow.VerticalScrollBarVisibility
+                                                          txtNewConsole.Document.Blocks.Clear()
+                                                          Dim parNew As New Paragraph
+                                                          txtNewConsole.Document.Blocks.Add(parNew)
+                                                          txtNewConsole.Tag = parNew
+                                                          clsNewContainer = New WindowObject(txtNewConsole)
+                                                          dicWindows.Add(strWindowName, clsNewContainer)
+                                                          Dim dkpContainer As New DockPanel
+                                                          dkpContainer.Children.Add(txtNewConsole)
+                                                          tabCopy.Content = dkpContainer
+                                                          clsNewContainer.Name = strWindowName
+                                                          Dim intNewTabIndex As Integer = tctlWindowFrame.Items.Add(tabCopy)
+                                                          tctlWindowFrame.SelectedIndex = intNewTabIndex
+                                                          Forms.Application.DoEvents()
+
+                                                      Catch ex As Exception
+                                                          blnProcessing = False
+                                                          CConsole.WriteException(ex)
+                                                      End Try
+                                                      Return clsNewContainer
+                                                  End Function
+        )
+
+
     End Function
 
 
@@ -354,20 +444,50 @@ Public Class WConsole
         wpfDataSourceViewer = Nothing
     End Sub
 
-    Private Sub tmrRunTask_Elapsed(sender As Object, e As Timers.ElapsedEventArgs) Handles tmrRunTask.Elapsed
-        If blnProcessing = True Then
-            Exit Sub
-        End If
-        If qtskActions.IsNullOrEmpty = False Then
-            Dim tskNext As Task = qtskActions.Dequeue
+   
+    Private Class WindowObject
+        Public Property Processing As Boolean
+        Public Property Textbox As Controls.RichTextBox
+        Private WithEvents tmrRunTask As New Timers.Timer
+        Private qtskToDo As New Queue(Of Task)
+        Public Property OverflowCount As Integer
+        Public Property Name As String
+        Public Sub New(rtxtWindow As Controls.RichTextBox)
+            Textbox = rtxtWindow
+            tmrRunTask.Interval = 0.00001
+            tmrRunTask.Start()
+        End Sub
+        Private Sub WaitForProcessing()
+            While Processing = True
+            End While
+        End Sub
+        Private Sub tmrRunTask_Elapsed(sender As Object, e As Timers.ElapsedEventArgs) Handles tmrRunTask.Elapsed
+            If Processing = True Then
+                Exit Sub
+            End If
+            If qtskToDo.Count > 0 Then
+                Dim tskNext As Task = qtskToDo.Dequeue
+                If tskNext IsNot Nothing Then
 
-            tskNext.Start()
-            tskNext.Wait()
 
-            tskNext.Dispose()
-        Else
-            tmrRunTask.Stop()
-        End If
+                    tskNext.Start()
+                    If tskNext.Status <> TaskStatus.RanToCompletion Then
+                        tskNext.Wait()
+                    End If
 
-    End Sub
+                End If
+                WaitForProcessing()
+                tskNext.Dispose()
+            Else
+                tmrRunTask.Stop()
+            End If
+
+        End Sub
+        Public Sub QueueTask(tskToQueue As task)
+            qtskToDo.Enqueue(tskToQueue)
+            tmrRunTask.Start()
+        End Sub
+      
+    End Class
+  
 End Class

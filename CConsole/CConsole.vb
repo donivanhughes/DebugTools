@@ -56,12 +56,25 @@
 '               SetFontSize - Sets the current paragraphs font size to the number specified
 '           - Changed the write functionality to use a queue system, so while it may be slower now, all of your
 '             writes and changes should be in order.
+' Version 0.5.0.1:
+'           - Shortened the update interval
+'           - Removed a couple wait loops
+' Version 0.6:
+'           - Added Error check to IsNullOrEmpty
+'           - Changed AddNewWindow to be in a new thread so I can set Apartmentstate to STA
+'           - Changed structure of windows so that each window(with the exception of overflow windows) is its own queue, meaning two
+'             windows will write simultaniously instead of in order.
+'           - Added functionality to prevent stack overflows. It now creates a new window, which is still referenced by the same key
+'             and writes to the new window instead. Hopefully this will solve issues writing huge amounts of text.
+'             The limit is currently set to 10k characters.
+'           - Fixed a bug where if the write process finished too quickly, the wait line would throw an error.
+'           - Fixed a bug where IsNullOrEmpty would throw an error due to the fact that items were still being added to the queue
 ' ----------------------------------------------------------------------------------------------------------------------------
 ' Tasks
 ' ----------------------------------------------------------------------------------------------------------------------------
-' CONTENTTODO: Change the writer functionality to work in a queued fashion, to prevent of the over lapping blocks of information
 ' CONTENTTODO: Add datatable change tracking (Might be too resource intensive)
-' CONTENTTODO: Possibly add a generic way to track changes in an object 
+' CONTENTTODO: Possibly add a generic way to track changes in an object
+' CONTENTTODO: Add more text manipulation functionality
 ' ----------------------------------------------------------------------------------------------------------------------------
 ' Imports
 ' ----------------------------------------------------------------------------------------------------------------------------
@@ -169,6 +182,16 @@ Namespace ConsoleTools
             Set(value As Boolean)
                 blnAlwaysOnTop = value
             End Set
+        End Property
+
+        Public Shared ReadOnly Property TextLength(strWindow As String) As Double
+            Get
+                Dim dblReturnValue As Double = -1
+                If wpfConsole IsNot Nothing Then
+                    dblReturnValue = wpfConsole.TextLength(strWindow)
+                End If
+                Return dblReturnValue
+            End Get
         End Property
 
 #End Region
@@ -448,7 +471,7 @@ Namespace ConsoleTools
                 'Iterate through all members of public visible elements in the object
                 'Get and Set for each element counts as separate members
                 For Each member As MemberInfo In typObject.GetMembers
-                    'Get Membet type
+                    'Get Member type
                     Dim mType = member.MemberType
 
                     'Handle according to the type
@@ -668,13 +691,18 @@ Namespace ConsoleTools
         '''  ------------------------------------------------------------------------------------------
         Public Shared Sub WriteException(ex As Exception)
             If Enabled Then
+                Intitialize()
+
+
+                Application.DoEvents()
+
                 Dim strMessage As String
                 strMessage &= "Error: " & ex.Message & vbNewLine
                 If ex.InnerException IsNot Nothing Then
                     strMessage &= "InnerException: " & ex.InnerException.Message & vbNewLine
                 End If
                 strMessage &= "Stack Trace: " & ex.StackTrace & vbNewLine & m_strSeparator
-                WriteLine(strMessage, "Errors")
+                wpfConsole.Write(strMessage & vbNewLine, "Error", blnIsException:=True)
             End If
         End Sub
 #End Region

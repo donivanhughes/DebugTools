@@ -1,4 +1,8 @@
 ﻿Imports System.Runtime.CompilerServices
+Imports System.Windows.Controls
+Imports System.Windows.Documents
+Imports DebugTools.ConsoleTools
+
 
 Module MMain
     ''' ------------------------------------------------------------------------------------------
@@ -10,15 +14,45 @@ Module MMain
     <Extension()> _
     Public Function IsNullOrEmpty(ienuToExtend As IEnumerable) As Boolean
         Dim blnReturnValue As Boolean = True
-
-        If ienuToExtend IsNot Nothing Then
-            For Each Item In ienuToExtend
-                blnReturnValue = False
-                Exit For
-            Next
-        End If
-
+        Try
+            If ienuToExtend IsNot Nothing Then
+                For Each Item In ienuToExtend
+                    blnReturnValue = False
+                    Exit For
+                Next
+            End If
+        Catch ex As Exception
+            CConsole.WriteException(ex)
+        End Try
         Return blnReturnValue
+
+    End Function
+
+    <Extension()> _
+    Public Function Text(rtxtToExtend As RichTextbox) As String
+        Dim strReturnValue As String = ""
+        Try
+            With rtxtToExtend.Document
+                strReturnValue = New TextRange(.ContentStart, .ContentEnd).Text
+            End With
+        Catch ex As Exception
+            CConsole.WriteException(ex)
+        End Try
+        Return strReturnValue
+
+    End Function
+
+    <Extension()> _
+    Public Function Length(rtxtToExtend As RichTextBox) As Double
+        Dim dblReturnValue As String = -1
+        Try
+            With rtxtToExtend.Document
+                dblReturnValue = New TextRange(.ContentStart, .ContentEnd).Text.Length
+            End With
+        Catch ex As Exception
+            CConsole.WriteException(ex)
+        End Try
+        Return dblReturnValue
 
     End Function
 
