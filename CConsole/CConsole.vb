@@ -15,10 +15,10 @@
 '           - Added mouse information toggleable tab.
 '           - Added partial logging functionality, but throw a NotImplemented exception unless in Dev Mode
 '           - Added Always On Top toggleable button
-'           - Changed FPerformanceViewer and FConsole from Public to Friend, so they are inaccessable outside of DebugTools
-'           - Commented out the entire class and updated all the documantation.
+'           - Changed FPerformanceViewer and FConsole from Public to Friend, so they are inaccessible outside of DebugTools
+'           - Commented out the entire class and updated all the documentation.
 ' Version 0.2:
-'           - Converted the entire form into a WPF. This is still accessable from a winform,
+'           - Converted the entire form into a WPF. This is still accessible from a winform,
 '             and may work with WPF applications as well now
 '           - The Status bar functions (such as 'Always on Top') are now in the menu on the top of the form,
 '             and are now checkable, vs the old highlighted method.
@@ -52,7 +52,7 @@
 '             which, like everything else, works on a per window basis. If at any point you use any of the new 
 '             functions , such as SetFontSize, it will affect the entire current paragraph.
 '           - Added functions to manipulate the current paragraph:
-'               SetStyle - Let you Bold, Italisize, Underline,, Strike and a few other things
+'               SetStyle - Let you Bold, Italicize, Underline,, Strike and a few other things
 '               SetFontSize - Sets the current paragraphs font size to the number specified
 '           - Changed the write functionality to use a queue system, so while it may be slower now, all of your
 '             writes and changes should be in order.
@@ -63,12 +63,30 @@
 '           - Added Error check to IsNullOrEmpty
 '           - Changed AddNewWindow to be in a new thread so I can set Apartmentstate to STA
 '           - Changed structure of windows so that each window(with the exception of overflow windows) is its own queue, meaning two
-'             windows will write simultaniously instead of in order.
+'             windows will write simultaneously instead of in order.
 '           - Added functionality to prevent stack overflows. It now creates a new window, which is still referenced by the same key
 '             and writes to the new window instead. Hopefully this will solve issues writing huge amounts of text.
 '             The limit is currently set to 10k characters.
 '           - Fixed a bug where if the write process finished too quickly, the wait line would throw an error.
 '           - Fixed a bug where IsNullOrEmpty would throw an error due to the fact that items were still being added to the queue
+' Version 0.6.1:
+'           - Added possible fix for writes not queuing correctly
+' Version 0.6.2:
+'           - Added Total Writes field in status bar
+'           - Added some info for the CConsole itself into a new menu object:
+'               - If main console is processing
+'               - How many queued items there are between all queues
+'               - How many queues are still processing items
+'           - Corrected some spelling mistakes
+' Version 0.7:
+'           - Added some functionality for the new DebugPlatform, a locally running instance of CConsole that any application can send
+'             debug information too.
+'           - Changed all write overloads to funnel through the fully parameterized version for instantiation purposes
+' Version 0.7.1:
+'           - Added a compatibility version for 3.5 projects
+' Version 1.0:
+'           - Finally functional enough to call a full version
+'           - Adding functionality for a status view to keep tabs on verious things.
 ' ----------------------------------------------------------------------------------------------------------------------------
 ' Tasks
 ' ----------------------------------------------------------------------------------------------------------------------------
@@ -80,6 +98,8 @@
 ' ----------------------------------------------------------------------------------------------------------------------------
 Imports System.IO
 Imports System.Reflection
+Imports System.Runtime.InteropServices
+Imports System.Windows
 Imports System.Windows.Forms
 Imports System.Windows.Forms.Integration
 
@@ -99,6 +119,8 @@ Namespace ConsoleTools
 
 #Region "Private Variables"
         Private Shared WithEvents wpfConsole As WConsole
+        Private Shared blnSendToPlatformFailure As Boolean = False
+        Private Shared WithEvents frmSender As New Form
         Private Shared objSource As Object
         Private Shared m_blnIsDevMode As Boolean = False
         Private Shared m_blnEnabled As Boolean = True
@@ -110,11 +132,13 @@ Namespace ConsoleTools
         Private Shared WithEvents evlLogConfiguration As EventLog
         Private Shared blnIsOpen As Boolean = False
         Private Shared blnAlwaysOnTop As Boolean = False
+        Private Shared ptrLocalWindow As IntPtr
+
 #End Region
 
 #Region "Public Properties"
         ''' ------------------------------------------------------------------------------------------
-        ''' <summary>Gets or sets the separator the CConsole will use for <see cref="CConsole.WriteSeperator">WriteSeperator</see>. </summary>
+        ''' <summary>Gets or sets the separator the CConsole will use for <see cref="CConsole.WriteSeparator">WriteSeperator</see>. </summary>
         ''' <value>The new separator to use.</value>
         ''' ------------------------------------------------------------------------------------------
         Public Shared Property Separator As String
@@ -187,11 +211,24 @@ Namespace ConsoleTools
         Public Shared ReadOnly Property TextLength(strWindow As String) As Double
             Get
                 Dim dblReturnValue As Double = -1
-                If wpfConsole IsNot Nothing Then
+                If Window IsNot Nothing Then
                     dblReturnValue = wpfConsole.TextLength(strWindow)
                 End If
                 Return dblReturnValue
             End Get
+        End Property
+
+        Public Shared Property Window As WConsole
+            Get
+                Return wpfConsole
+            End Get
+            Set(value As WConsole)
+                If wpfConsole IsNot Nothing AndAlso wpfConsole IsNot value Then
+                    wpfConsole.Close()
+                End If
+
+                wpfConsole = value
+            End Set
         End Property
 
 #End Region
@@ -203,7 +240,7 @@ Namespace ConsoleTools
         ''' ------------------------------------------------------------------------------------------
         ''' <summary> Whenever the console is closed, delete the instance of it. </summary>
         ''' ------------------------------------------------------------------------------------------
-        Private Shared Sub ConsoleWindowClosed() Handles wpfConsole.Closing
+        Private Shared Sub ConsoleWindowClosed() Handles wpfConsole.Closed
             'Clear instance reference
             wpfConsole = Nothing
         End Sub
@@ -231,10 +268,10 @@ Namespace ConsoleTools
         '''  ------------------------------------------------------------------------------------------
         Public Shared Sub Write(strText As String)
             If Enabled AndAlso My.Settings.ToolsEnabled Then
-                Intitialize()
-                wpfConsole.Write(strText, "Main", 0)
+
+                Write(strText, "Main", 0)
             End If
-            Application.DoEvents()
+            Forms.Application.DoEvents()
         End Sub
 
         ''' ------------------------------------------------------------------------------------------
@@ -246,10 +283,10 @@ Namespace ConsoleTools
         '''  ------------------------------------------------------------------------------------------
         Public Shared Sub Write(strText As String, strWindowName As String)
             If Enabled Then
-                Intitialize()
-                wpfConsole.Write(strText, strWindowName, 0)
+
+                Write(strText, strWindowName, 0)
             End If
-            Application.DoEvents()
+            Forms.Application.DoEvents()
         End Sub
 
         ''' ------------------------------------------------------------------------------------------
@@ -261,11 +298,19 @@ Namespace ConsoleTools
         ''' <param name="dblInterval">The minimum time in seconds allowed between writes to the output window</param>
         '''  ------------------------------------------------------------------------------------------
         Public Shared Sub Write(strText As String, strWindowName As String, dblInterval As Double)
-            If Enabled Then
-                Intitialize()
+            If blnSendToPlatformFailure = False Then
+                Try
+                    blnSendToPlatformFailure = Not SendMessageToPlatform(strText, strWindowName, dblInterval)
+                Catch ex As Exception
+                    blnSendToPlatformFailure = True
+                End Try
+            End If
+
+            If Enabled AndAlso blnSendToPlatformFailure = True Then
+                Initialize()
                 wpfConsole.Write(strText, strWindowName, dblInterval)
             End If
-            Application.DoEvents()
+            Forms.Application.DoEvents()
         End Sub
 
         ''' ------------------------------------------------------------------------------------------
@@ -306,9 +351,9 @@ Namespace ConsoleTools
         ''' <param name="strWindow">The name of the window on which to write</param>
         ''' <param name="dblInterval">The minimum time between writes to the console</param>
         ''' ------------------------------------------------------------------------------------------
-        Public Shared Sub Write(ienuOutput As IEnumerable, strWindow As String, dblInterval As Double)
+        Public Shared Sub WriteEnumberable(ienuOutput As IEnumerable, strWindow As String, dblInterval As Double)
             If Enabled = True Then
-                Intitialize()
+                'Initialize()
                 Dim strTextToPrint As String = ""
                 strTextToPrint &= "List Type: " & ienuOutput.GetType().ToString & vbNewLine
                 Dim intItemIndex As Double = 0
@@ -330,21 +375,21 @@ Namespace ConsoleTools
             If Enabled Then
                 Write(strText & vbNewLine, "Main")
             End If
-            Application.DoEvents()
+            Forms.Application.DoEvents()
         End Sub
 
         Public Shared Sub WriteLine(strText As String, strWindowName As String)
             If Enabled Then
                 Write(strText & vbNewLine, strWindowName)
             End If
-            Application.DoEvents()
+            Forms.Application.DoEvents()
         End Sub
 
         Public Shared Sub WriteLine(strText As String, strWindowName As String, dblInterval As Double)
             If Enabled Then
                 Write(strText & vbNewLine, strWindowName, dblInterval)
             End If
-            Application.DoEvents()
+            Forms.Application.DoEvents()
 
         End Sub
 
@@ -352,47 +397,47 @@ Namespace ConsoleTools
 #Region "RichTextBox Functionality"
         Public Shared Sub NewParagraph()
             If Enabled Then
-                Intitialize()
+                Initialize()
                 wpfConsole.NewParagraph("Main")
             End If
         End Sub
         Public Shared Sub NewParagraph(strWindow As String)
             If Enabled Then
-                Intitialize()
+                Initialize()
                 wpfConsole.NewParagraph(strWindow)
             End If
         End Sub
         Public Shared Sub SetStyle(TextStyle As TextStyles)
             If Enabled Then
-                Intitialize()
+                Initialize()
                 wpfConsole.SetStyling("Main", TextStyle)
             End If
         End Sub
         Public Shared Sub SetStyle(strWindow As String, TextStyle As TextStyles)
             If Enabled Then
-                Intitialize()
+                Initialize()
                 wpfConsole.SetStyling(strWindow, TextStyle)
             End If
         End Sub
         Public Shared Sub SetFontSize(dblFontSize As Double)
             If Enabled Then
-                Intitialize()
+                Initialize()
                 wpfConsole.SetStyling("Main", dblFontSize)
             End If
         End Sub
         Public Shared Sub SetFontSize(strWindow As String, dblFontSize As Double)
             If Enabled Then
-                Intitialize()
+                Initialize()
                 wpfConsole.SetStyling(strWindow, dblFontSize)
             End If
         End Sub
 #End Region
 #Region "Secondary Functionality"
-        Private Shared Sub Intitialize()
+        Private Shared Sub Initialize()
             If Enabled Then
                 If wpfConsole Is Nothing Then
                     wpfConsole = New WConsole
-                    ElementHost.EnableModelessKeyboardInterop(wpfConsole)
+                    ElementHost.EnableModelessKeyboardInterop(Window)
                     wpfConsole.Show()
                 End If
             End If
@@ -405,7 +450,7 @@ Namespace ConsoleTools
         '''  ------------------------------------------------------------------------------------------
         Public Shared Sub Open()
             If Enabled Then
-                Intitialize()
+                Initialize()
             End If
         End Sub
         ''' ------------------------------------------------------------------------------------------
@@ -418,7 +463,7 @@ Namespace ConsoleTools
             If Enabled Then
                 wpfConsole.Write("", strName)
             End If
-            Application.DoEvents()
+            Forms.Application.DoEvents()
         End Sub
 
         ''' ------------------------------------------------------------------------------------------
@@ -428,7 +473,7 @@ Namespace ConsoleTools
         '''  ------------------------------------------------------------------------------------------
         Public Shared Sub Clear()
             If Enabled Then
-                Intitialize()
+                Initialize()
                 wpfConsole.ClearWindow("Main")
             End If
 
@@ -441,7 +486,7 @@ Namespace ConsoleTools
         '''  ------------------------------------------------------------------------------------------
         Public Shared Sub Clear(strWindow)
             If Enabled Then
-                Intitialize()
+                Initialize()
                 wpfConsole.ClearWindow(strWindow)
             End If
         End Sub
@@ -691,10 +736,10 @@ Namespace ConsoleTools
         '''  ------------------------------------------------------------------------------------------
         Public Shared Sub WriteException(ex As Exception)
             If Enabled Then
-                Intitialize()
+                Initialize()
 
 
-                Application.DoEvents()
+                Forms.Application.DoEvents()
 
                 Dim strMessage As String
                 strMessage &= "Error: " & ex.Message & vbNewLine
@@ -863,8 +908,100 @@ Namespace ConsoleTools
 
 #End Region
 
+#Region "Write To Platform"
+        Public Shared Function SendMessageToPlatform(strText As String, strWindow As String, dblInterval As Double) As Boolean
+            Dim blnSuccess = True
+            Dim clsMessage As New Message(strText, strWindow, dblInterval)
+            Dim strMessage As String = clsMessage.ToString
+            Dim changeFilter As New NativeMethods.CHANGEFILTERSTRUCT()
+            changeFilter.size = CUInt(Marshal.SizeOf(changeFilter))
+            changeFilter.info = 0
+            If Not NativeMethods.ChangeWindowMessageFilterEx(frmSender.Handle, NativeMethods.WM_COPYDATA, NativeMethods.ChangeWindowMessageFilterExAction.Allow, changeFilter) Then
+                Dim [error] As Integer = Marshal.GetLastWin32Error()
+                blnSuccess = False
+            End If
 
+
+
+            Dim windowTitle As String = "CConsoleReceiver"
+            ' Find the window with the name of the main form
+            If ptrLocalWindow = IntPtr.Zero Then
+                ptrLocalWindow = NativeMethods.FindWindow(Nothing, windowTitle)
+            End If
+            If ptrLocalWindow = IntPtr.Zero Then
+                blnSuccess = False
+            Else
+                Dim ptrCopyData As IntPtr = IntPtr.Zero
+                Try
+                    ' Create the data structure and fill with data
+                    Dim copyData As New NativeMethods.COPYDATASTRUCT()
+                    copyData.dwData = New IntPtr(2)
+                    ' Just a number to identify the data type
+                    copyData.cbData = strMessage.Length + 1
+                    ' One extra byte for the \0 character
+                    copyData.lpData = Marshal.StringToHGlobalAnsi(strMessage)
+
+                    ' Allocate memory for the data and copy
+                    ptrCopyData = Marshal.AllocCoTaskMem(Marshal.SizeOf(copyData))
+                    Marshal.StructureToPtr(copyData, ptrCopyData, False)
+
+                    ' Send the message
+                    NativeMethods.SendMessage(ptrLocalWindow, NativeMethods.WM_COPYDATA, IntPtr.Zero, ptrCopyData)
+                Catch ex As Exception
+
+                    blnSuccess = False
+                Finally
+                    ' Free the allocated memory after the control has been returned
+                    If ptrCopyData <> IntPtr.Zero Then
+                        Marshal.FreeCoTaskMem(ptrCopyData)
+                    End If
+                End Try
+            End If
+            Return blnSuccess
+        End Function
+        Public Shared Function PreparePlatform() As Boolean
+            Dim blnSuccess = False
+            If SystemInformation.UserName = "hughes.dh.1" Then
+                ptrLocalWindow = NativeMethods.FindWindow(Nothing, "CConsoleReceiver")
+                If ptrLocalWindow = IntPtr.Zero Then
+                    Dim app As String = "file://C:/Users/hughes.dh.1/OneDrive/Personal Projects/GitHub/DebugPlatform/publish/DebugPlatform.application"
+                    Process.Start("rundll32.exe", Convert.ToString("dfshim.dll,ShOpenVerbApplication ") & app)
+                    ptrLocalWindow = NativeMethods.FindWindow(Nothing, "CConsoleReceiver")
+                End If
+                If ptrLocalWindow = IntPtr.Zero Then
+                    blnSuccess = True
+                End If
+
+            End If
+            Return blnSuccess
+        End Function
+#End Region
+       
+
+       
     End Class
+    Public Class Message
+        Public Property Text As String = "{EMPTY}"
+        Public Property Window As String = "Main"
+        Public Property Interval As Integer = 0
+        Public Sub New()
 
+        End Sub
+        Public Sub New(strText As String, strWindow As String, dblInteval As Double)
+            Text = strText
+            Window = strWindow
+            Interval = dblInteval
+        End Sub
 
+        ''' ------------------------------------------------------------------------------------------
+        '''  Name: ToString
+        '''  ------------------------------------------------------------------------------------------
+        ''' <summary> Returns a <see cref="System.String" /> that represents this instance. </summary>
+        ''' <returns>A <see cref="System.String" /> that represents this instance.</returns>
+        '''  ------------------------------------------------------------------------------------------
+        Public Overrides Function ToString() As String
+
+            Return DebugTools.Serialization.JSON.Serialize(Me)
+        End Function
+    End Class
 End Namespace

@@ -9,29 +9,42 @@ Imports System.Windows.Forms
 Imports System.Windows.Forms.Integration
 Imports System.Windows.Input
 Imports DebugTools.ConsoleTools
-
-
+Imports Telerik.Windows.Controls
 
 
 Public Class WConsole
     Delegate Sub SetTextCallback(strText As String)
 
 
-
+    Private WithEvents frmReceiver As New CConsoleReciever
     Private wpfPerformanceViewer As WPerformanceViewer
     Private wpfDataSourceViewer As WDataSourceViewer
     Private dicWindows As Dictionary(Of String, WindowObject)
-
+    Private dtmStart As DateTime
+    Private dtmEnd As DateTime
     Private WithEvents tmrUpdateInfo As New Timers.Timer
     Private WithEvents tmrCleanUp As New Timers.Timer
-
+    Private ldtmTimepoints As New List(Of Item)
     Private dblTimeSinceWrite As Double = 0
     Private lkeyPressedKeys As New List(Of Key)
     Private ltskToCleanUp As New List(Of Task)
     Private blnProcessing As Boolean = False
+    Private intTotalWrites As Integer
     Private dblTimeSinceLastTaskRun
+    Private tabToModify As TabItem
+    Private niTaskBarIcon As New NotifyIcon
+    Private blnQuit As Boolean = False
+    Public Class Track
+        Public Property Data() As IEnumerable(Of Item)
 
+        Public Property StartDate() As Date
+        Public Property EndDate() As Date
+    End Class
 
+    Public Class Item
+        Public Property Duration() As TimeSpan
+        Public Property [Date]() As Date
+    End Class
 
 
 
@@ -58,6 +71,23 @@ Public Class WConsole
         tmrUpdateInfo.Start()
         tmrCleanUp.Start()
 
+        CConsole.Window = Me
+
+        frmReceiver.Show()
+        frmReceiver.Hide()
+
+        dtmStart = DateTime.Now
+
+        tctlWindowFrame.Tag = tabMain.ContextMenu
+
+        niTaskBarIcon.Icon = My.Resources.ConsoleIcon
+        Dim ShowWindow = (Sub(sender As Object, args As EventArgs)
+                              Me.Show()
+                              Me.WindowState = WindowState.Normal
+                              niTaskBarIcon.Visible = False
+                          End Sub)
+        AddHandler niTaskBarIcon.DoubleClick, ShowWindow
+
 
 
     End Sub
@@ -78,10 +108,23 @@ Public Class WConsole
         Forms.Application.DoEvents()
     End Sub
 
+    Public Sub ReceiveMessage(clsMessage As ConsoleTools.Message) Handles frmReceiver.MessageReceived
+
+        If Me.WindowState = Windows.WindowState.Minimized Then
+            Me.Show()
+            Me.WindowState = WindowState.Normal
+            niTaskBarIcon.Visible = False
+        End If
+        Write(clsMessage.Text, clsMessage.Window, clsMessage.Interval)
+    End Sub
 
 
     Friend Sub Write(strText As String, strWindow As String, Optional dblInterval As Double = 0, Optional ByVal blnIsException As Boolean = False)
+
+
+
         If Math.Abs(dblInterval - 0) <= 0 OrElse dblTimeSinceWrite > dblInterval Then
+            intTotalWrites += 1
             dblTimeSinceWrite = 0
 
             If dicWindows.ContainsKey(strWindow) = False Then
@@ -141,8 +184,6 @@ Public Class WConsole
                                                                                      blnProcessing = False
 
                                                                                      Forms.Application.DoEvents()
-                                                                                 Catch ex As StackOverflowException
-                                                                                     dicWindows(strWindow) = AddNewWindow(strWindow + "Overflow")
                                                                                  Catch ex As Exception
                                                                                      blnProcessing = False
                                                                                      CConsole.WriteException(ex)
@@ -181,6 +222,7 @@ Public Class WConsole
         WaitForProcessing()
         dicWindows(strWindow).QueueTask(SuppressWarning)
 
+
     End Sub
     Friend Sub SetStyling(strWindow As String, NewFontSize As Double)
         Dim SuppressWarning = New Task(Sub()
@@ -216,6 +258,8 @@ Public Class WConsole
                                   clsWindowObject.OverflowCount += 1
 
                                   tabCopy.Header = clsWindowObject.Name & "(" & clsWindowObject.OverflowCount & ")"
+                                  tabCopy.ContextMenu = tctlWindowFrame.Tag
+                                  AddHandler tabCopy.ContextMenuOpening, AddressOf TabContextMenuOpening
 
                                   txtNewConsole = New Windows.Controls.RichTextBox
                                   txtNewConsole.Name = "txt" & clsWindowObject.Textbox.Name & clsWindowObject.OverflowCount
@@ -253,7 +297,7 @@ Public Class WConsole
                           End Sub
         )
     End Sub
-    Friend Sub ClearWindow(strWindow)
+    Friend Sub ClearWindow(strWindow As String)
         Try
 
             If dicWindows.ContainsKey(strWindow) Then
@@ -280,8 +324,11 @@ Public Class WConsole
                                                       Dim tabCopy As TabItem = New TabItem()
                                                       Dim txtNewConsole As Windows.Controls.RichTextBox = Nothing
                                                       tabCopy.Header = strWindowName
+                                                      tabCopy.ContextMenu = tctlWindowFrame.Tag
+                                                      AddHandler tabCopy.ContextMenuOpening, AddressOf TabContextMenuOpening
+
                                                       txtNewConsole = New Windows.Controls.RichTextBox
-                                                      txtNewConsole.Name = "txt" & strWindowName.Replace(" ", "")
+                                                      txtNewConsole.Name = "txt" & strWindowName.Replace(" ", "").Replace("-", "_").Replace(":", "_")
                                                       txtNewConsole.Foreground = Windows.Media.Brushes.White
                                                       txtNewConsole.Background = Windows.Media.Brushes.Black
                                                       txtNewConsole.FontFamily = txtConsoleWindow.FontFamily
@@ -293,6 +340,7 @@ Public Class WConsole
                                                       txtNewConsole.Margin = txtConsoleWindow.Margin
                                                       txtNewConsole.VerticalScrollBarVisibility = txtConsoleWindow.VerticalScrollBarVisibility
                                                       txtNewConsole.Document.Blocks.Clear()
+
                                                       Dim parNew As New Paragraph
                                                       txtNewConsole.Document.Blocks.Add(parNew)
                                                       txtNewConsole.Tag = parNew
@@ -378,6 +426,7 @@ Public Class WConsole
         lblQueuedItems.Content = "Items Queued: " & intTotalItemsQueued
         lblIsProcessing.Content = "Processing: " & blnProcessing
         lblQueuesProcessing.Content = "Queues Processing: " & intTotalQueuesProcessing
+        lblTotalWrites.Content = "Total Writes Called: " & intTotalWrites
     End Sub
     Private Sub GetKeyboardData()
         Dim lkeyBuffer As New List(Of Key)
@@ -434,14 +483,32 @@ Public Class WConsole
             Me.Width -= 115
         End If
     End Sub
+    Protected Overrides Sub OnStateChanged(e As EventArgs)
+        If WindowState = WindowState.Minimized Then
 
+            Me.Hide()
+            niTaskBarIcon.Visible = True
+        End If
+
+        MyBase.OnStateChanged(e)
+    End Sub
     Private Sub CloseWindow() Handles mnuFileExit.Click
+        blnQuit = True
         Me.Close()
     End Sub
 
     Private Sub WConsole_Closing(sender As Object, e As System.ComponentModel.CancelEventArgs) Handles Me.Closing
-        GC.Collect()
-        tmrCleanUp_Tick()
+        If blnQuit = False Then
+            e.Cancel = True
+            Me.WindowState = WindowState.Minimized
+        Else
+
+            GC.Collect()
+            tmrCleanUp_Tick()
+            niTaskBarIcon.Visible = False
+        End If
+
+        
     End Sub
 
     Public Sub OpenDataSourceViewer()
@@ -462,7 +529,7 @@ Public Class WConsole
         wpfDataSourceViewer = Nothing
     End Sub
 
-   
+
     Private Class WindowObject
         Public Property Processing As Boolean
         Public Property Textbox As Controls.RichTextBox
@@ -521,7 +588,26 @@ Public Class WConsole
 
             tmrRunTask.Start()
         End Sub
-      
+
     End Class
-  
+
+    Private Sub ctmCloseTab_Click(sender As Object, e As RoutedEventArgs) Handles ctmCloseTab.Click
+        dicWindows.Remove(tabToModify.Header)
+        DirectCast(tabToModify.Parent, Controls.TabControl).Items.Remove(tabToModify)
+
+    End Sub
+
+    Private Sub ctmClearTab_Click(sender As Object, e As RoutedEventArgs) Handles ctmClearTab.Click
+        ClearWindow(tabToModify.Header)
+    End Sub
+
+    Private Sub TabContextMenuOpening(sender As Object, e As ContextMenuEventArgs) Handles tabMain.ContextMenuOpening
+        tabToModify = sender
+    End Sub
+
+   
+    Private Sub mnuToolsStatusViewer_Click(sender As Object, e As RoutedEventArgs) Handles mnuToolsStatusViewer.Click
+        Dim test As New WStatusViewer
+        test.ShowDialog()
+    End Sub
 End Class

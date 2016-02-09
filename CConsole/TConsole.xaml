@@ -1,0 +1,12 @@
+﻿<Window
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:telerik="http://schemas.telerik.com/2008/xaml/presentation" x:Class="TConsole" 
+             mc:Ignorable="d" 
+             d:DesignHeight="300" d:DesignWidth="300">
+    <Grid>
+        <telerik:RadTimeline Content="RadTimeline" HorizontalAlignment="Left" Height="130" Margin="10,41,-18,0" PeriodStart="12/24/2015 00:00:00" PeriodEnd="01/03/2016 00:00:00" VerticalAlignment="Top" Width="300"/>
+    </Grid>
+</Window>
